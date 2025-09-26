@@ -6,14 +6,26 @@ from flask_cors import CORS
 import pandas as pd
 import xgboost as xgb
 import os
+import sys
 
 app = Flask(__name__)
 CORS(app)
 
-# Load model
+# Model path
 MODEL_PATH = "phishing_model.json"
+
+# Load model safely
 model = xgb.XGBClassifier()
-model.load_model(MODEL_PATH)
+if not os.path.exists(MODEL_PATH):
+    print(f"ERROR: Model file '{MODEL_PATH}' not found!")
+    sys.exit(1)
+
+try:
+    model.load_model(MODEL_PATH)
+    print(f"Model '{MODEL_PATH}' loaded successfully.")
+except Exception as e:
+    print("Failed to load model:", e)
+    sys.exit(1)
 
 # Feature columns (must match training)
 FEATURE_COLUMNS = [
@@ -39,7 +51,8 @@ def extract_features_from_request(data):
         df = pd.DataFrame([data])
         df = df[FEATURE_COLUMNS]  # Keep only required features
         return df
-    except KeyError:
+    except KeyError as e:
+        print("Missing features in request:", e)
         return None
 
 @app.route("/check_url", methods=["POST"])
@@ -59,5 +72,6 @@ def check_url():
     })
 
 if __name__ == "__main__":
-    port = int(os.environ.get("PORT", 5000))  # Use Render-provided PORT
+    port = int(os.environ.get("PORT", 5000))  # Render provides PORT
+    print(f"Starting Flask app on 0.0.0.0:{port}")
     app.run(host="0.0.0.0", port=port)
